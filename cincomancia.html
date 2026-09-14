@@ -1,30 +1,372 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Cincomancia</title><style>
+<html><head><meta charset="UTF-8"><meta name="color-scheme" content="light"><title>Cincomancia</title><style>
 
-html { background-color: #d4d0c8; transform-origin: 0 0 }
+:root {
+	color-scheme: light;
+	--ink: #2b1d10;
+	--parchment: #e8d9b0;
+	--parchment-dim: #d9c799;
+	--wood: #4a3826;
+	--gold: #cf9a35;
+	--gold-hover: #dcac4f;
+	--gold-shadow: #96701f;
+	--gold-active: #b98726;
+	--muted: #6b5638;
+	--chip-bg: #ffffff;
+	--chip-border: rgba(43,29,16,.35);
+	--chip-shadow: rgba(43,29,16,.2);
+	--outline: #2b1d10;
+
+	/* extracted from the game's own art -- the 5 wand-tag colors */
+	--violet: #EE7EEB;
+	--electric-aqua: #46E0EC;
+	--banana-cream: #FFE964;
+	--royal-gold: #EDCF54;
+	--wisteria-blue: #88A5E2;
+	--dusty-mauve: #8C78A0;
+}
+
+html { background: var(--wood); }
+body { margin: 0; }
 html, body, div, img { user-select: none; /* No prefix supported by Chrome and Opera */
                    -ms-user-select: none; /* Internet Explorer/Edge */
                   -moz-user-select: none; /* Firefox */
-                -khtml-user-select: none; /* Konqueror HTML */
+                -khtml-user-select: none; /* Konqueror IHTML */
                -webkit-user-select: none; /* Safari */
              -webkit-touch-callout: none; /* iOS Safari */
 overflow: hidden
 }
 div, img { position: absolute }
-.grid { width: 330px; height: 660px; top: 114px; z-index: -1 }
+#chrome, #wandsWrap, #controlsGroup { position: static; }
+
+/* All 5 wands always stay in one row, scaled as a single unit to fit
+   whatever width is available (like the original tool) -- rather than
+   wrapping into multiple rows or using a fixed size. #chrome (legend+
+   reset) is separate, real HTML outside this scaled row, so it stays
+   legible at any scale instead of shrinking along with the grid. */
+#wandsWrap { overflow: hidden; }
+
+#wandsRow {
+	display: flex;
+	gap: 14px;
+	transform-origin: 0 0;
+}
+
+.wandCard {
+	position: relative;
+	z-index: 0;
+	width: 354px;
+	height: 754px;
+	background: var(--parchment);
+	border: 3px solid var(--outline);
+	border-radius: 8px;
+	box-sizing: border-box;
+	box-shadow: 0 4px 10px rgba(0,0,0,.25);
+	flex: 0 0 auto;
+	/* .wandTag straddles this card's top border by design (its top is
+	   negative -- see tag.style.top below); the blanket `div{overflow:
+	   hidden}` rule above would otherwise clip the badge's top edge right
+	   where the border line is, instead of it sitting cleanly on top. */
+	overflow: visible;
+}
+
+.grid { width: 330px; height: 660px; z-index: -1 }
 .boxOuter { width: 66px; height: 66px; z-index: -2 }
 .boxFull  { width: 66px; height: 66px }
 .boxRight { width: 24px; height: 24px }
 .boxLeft  { width: 42px; height: 24px }
 .boxUpper { width: 66px; height: 42px }
 
+#chrome {
+	box-sizing: border-box;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 6px 10px;
+	background: var(--parchment);
+	border: 3px solid var(--outline);
+	box-shadow: 0 4px 12px rgba(0,0,0,.3);
+	position: relative;
+	z-index: 2;
+	/* the blanket `div{overflow:hidden}` rule above would otherwise clip
+	   the legend tooltips right at this bar's own edge, since they're
+	   meant to pop up above it */
+	overflow: visible;
+}
+
+/* Shared by every button in the chrome bar (Reset, the injected Force
+   refresh, the theme cycler) so they all get the same tactile press
+   animation instead of some having it and some not. */
+.chromeBtn {
+	font: 700 12px/1 -apple-system, "Helvetica Neue", Arial, sans-serif;
+	color: var(--ink);
+	background: var(--gold);
+	border: 2px solid var(--ink);
+	border-radius: 6px;
+	padding: 7px 13px;
+	cursor: pointer;
+	white-space: nowrap;
+	flex: 0 0 auto;
+	box-shadow: 0 3px 0 var(--gold-shadow);
+	transition: transform .05s, box-shadow .05s;
+}
+.chromeBtn:hover { background: var(--gold-hover); }
+.chromeBtn:active {
+	background: var(--gold-active);
+	transform: translateY(3px);
+	box-shadow: none;
+}
+
+/* Everything but the legend is grouped here so wrapping (on a narrow
+   window) moves this whole cluster to its own line as one unit, instead
+   of individual buttons peeling off and stranding alone. margin-left:auto
+   pushes the whole group to the right edge when there's room. */
+#controlsGroup {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-left: auto;
+}
+
+/* Fixed width (sized for the longest label, "Legacy") so the button
+   doesn't change size -- and therefore doesn't make the row's wrapping
+   jump around -- as you cycle between theme names of different lengths. */
+#themeButton { min-width: 92px; }
+
+#legend {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+}
+#legend li {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font: 600 11px/1.2 -apple-system, "Helvetica Neue", Arial, sans-serif;
+	color: var(--ink);
+	white-space: nowrap;
+	background: var(--chip-bg);
+	border: 1px solid var(--chip-border);
+	box-shadow: 0 1px 0 var(--chip-shadow);
+	border-radius: 20px;
+	padding: 2px 8px 2px 3px;
+	cursor: help;
+	position: relative;
+}
+
+/* Global hover tooltip: a single floating element repositioned in JS
+   (see showTip/hideTip below) rather than a per-item CSS ::after, so it
+   can be clamped to stay inside the viewport instead of clipping off the
+   edge when the target is near a border or the window edge. */
+#gtip {
+	position: fixed;
+	z-index: 9999;
+	background: var(--ink);
+	color: var(--parchment);
+	font: 600 12px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif;
+	padding: 6px 9px;
+	border-radius: 6px;
+	max-width: 220px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .12s;
+}
+#legend .sw {
+	display: inline-block;
+	width: 11px;
+	height: 11px;
+	border-radius: 3px;
+	border: 1px solid rgba(0,0,0,.4);
+	flex: 0 0 auto;
+}
+
+.wandTag {
+	width: 18px;
+	height: 16px;
+	border-radius: 50%;
+	border: 2px solid var(--ink);
+	color: var(--ink);
+	font: 700 11px/14px -apple-system, "Helvetica Neue", Arial, sans-serif;
+	text-align: center;
+	padding-top: 2px;
+	z-index: 1;
+}
+
+/* Hidden by default -- only shown (via .show, toggled in recalc()) on the
+   one wand currently being asked "which slot does this go in?", not all
+   the time. */
+.slotNum {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: rgba(232,217,176,.9);
+	border: 1px solid var(--ink);
+	color: var(--ink);
+	font: 700 9px/13px -apple-system, "Helvetica Neue", Arial, sans-serif;
+	text-align: center;
+	z-index: 1;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .1s;
+}
+.slotNum.show { opacity: 1; }
+
 </style></head><body>
 
-<div style="top:840px;left:0;width:2046px;height:100px;text-align:center"><button style="font-size:24px" id="resetButton">Reset</button></div>
+<div id="wandsWrap"><div id="wandsRow"></div></div>
+
+<div id="chrome">
+	<ul id="legend"></ul>
+	<div id="controlsGroup">
+		<button id="resetButton" class="chromeBtn">Reset</button>
+		<button id="themeButton" class="chromeBtn" type="button"></button>
+	</div>
+</div>
+
+<div id="gtip"></div>
 
 <script type="text/javascript">
 
-document.documentElement.style.transform = 'scale(' + ((window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth) / 2046) + ')';
+var wandsRowEl = document.getElementById('wandsRow');
+var wandsWrapEl = document.getElementById('wandsWrap');
+
+var NATIVE_ROW_W = 5 * 354 + 4 * 14; // 5 cards + the gaps between them
+var NATIVE_ROW_H = 754;
+
+function updateWandsScale() {
+  var w = document.body.clientWidth || window.innerWidth;
+  var scale = w / NATIVE_ROW_W;
+  wandsRowEl.style.transform = 'scale(' + scale + ')';
+  wandsWrapEl.style.height = (NATIVE_ROW_H * scale) + 'px';
+}
+
+// ------------------------------------------------------------
+// Global hover tooltip -- one floating element, repositioned per-target
+// on hover and clamped to the viewport so it can't clip off the top/side
+// of the window even when the target sits right at an edge.
+// ------------------------------------------------------------
+var gtipEl = document.getElementById('gtip');
+
+// Shared with index.html's "Board tips" toggle via the same localStorage key
+// it already writes (automancia_hover_tips) -- more robust than reaching for
+// a live property on window.parent, and the same cross-doc approach the
+// theme already relies on. Unlike the always-on legend tooltips above, this
+// gate only applies to the new effect/slot tooltips.
+function boardTipsEnabled() {
+  return (localStorage.getItem('automancia_hover_tips') || 'on') === 'on';
+}
+window.addEventListener('storage', function(e) {
+  if (e.key === 'automancia_hover_tips' && e.newValue !== 'on') gtipHide();
+});
+
+function gtipShowText(el, text) {
+  if (!text) return;
+  gtipEl.textContent = text;
+  gtipEl.style.left = '0px';
+  gtipEl.style.top = '0px';
+  gtipEl.style.opacity = '1';
+
+  var r = el.getBoundingClientRect();
+  var tw = gtipEl.offsetWidth;
+  var th = gtipEl.offsetHeight;
+
+  var x = r.left + r.width / 2 - tw / 2;
+  x = Math.max(6, Math.min(x, window.innerWidth - tw - 6));
+
+  var y = r.top - th - 8;
+  if (y < 6) y = r.bottom + 8; // not enough room above -- show below instead
+
+  gtipEl.style.left = x + 'px';
+  gtipEl.style.top = y + 'px';
+}
+
+function gtipShow() {
+  gtipShowText(this, this.getAttribute('data-tip'));
+}
+
+function gtipHide() {
+  gtipEl.style.opacity = '0';
+}
+
+function initTooltips(root) {
+  (root || document).querySelectorAll('[data-tip]').forEach(function(el) {
+    el.addEventListener('mouseenter', gtipShow);
+    el.addEventListener('mouseleave', gtipHide);
+  });
+}
+
+// ------------------------------------------------------------
+// Theme cycling: 4 color-scheme presets applied by overriding the CSS
+// custom properties everything else already reads from. Persisted in
+// localStorage, which is shared with the parent page (same origin) --
+// automancia's index.html listens for the `storage` event to pick up a
+// change made here live, without needing to reload.
+// ------------------------------------------------------------
+var THEME_ORDER = ['cinco', 'light', 'dark', 'old'];
+var THEME_LABEL = { cinco: 'Cinco', light: 'Light', dark: 'Dark', old: 'Legacy' };
+var THEMES = {
+  // the parchment/gold look this whole redesign has been using -- not a
+  // generic "light mode", it's this project's own theme, so it's named
+  // for the game instead.
+  cinco: { ink: '#2b1d10', parchment: '#e8d9b0', wood: '#4a3826', gold: '#cf9a35', goldHover: '#dcac4f', goldShadow: '#96701f', goldActive: '#b98726', muted: '#6b5638',
+           chipBg: '#ffffff', chipBorder: 'rgba(43,29,16,.35)', chipShadow: 'rgba(43,29,16,.2)', outline: '#2b1d10' },
+  // an actual clean/neutral light mode, distinct from "cinco"
+  light: { ink: '#1c1c1e', parchment: '#ffffff', wood: '#eef0f2', gold: '#3b82f6', goldHover: '#2f6fd6', goldShadow: '#1d4ed8', goldActive: '#2563eb', muted: '#6b7280',
+           chipBg: '#ffffff', chipBorder: 'rgba(0,0,0,.15)', chipShadow: 'rgba(0,0,0,.08)', outline: '#1c1c1e' },
+  // deliberately just 2 near-black grays + white text + gold accent --
+  // not a tinted brown like the others, and no more colors than that.
+  // outline is black (not --ink/white) so panel edges disappear into the
+  // black background instead of drawing a bright box around everything.
+  dark:  { ink: '#ffffff', parchment: '#1a1a1a', wood: '#000000', gold: '#caa53d', goldHover: '#dab659', goldShadow: '#8a6f26', goldActive: '#a5822c', muted: '#999999',
+           chipBg: '#0d0d0d', chipBorder: 'rgba(255,255,255,.25)', chipShadow: 'rgba(0,0,0,.6)', outline: '#000000' },
+  old:   { ink: '#222222', parchment: '#d4d0c8', wood: '#383735', gold: '#b0aca0', goldHover: '#c2beb2', goldShadow: '#7d7a70', goldActive: '#948f83', muted: '#555555',
+           chipBg: '#ffffff', chipBorder: 'rgba(0,0,0,.3)', chipShadow: 'rgba(0,0,0,.15)', outline: '#222222' }
+};
+var THEME_DEFAULT = 'cinco';
+
+function applyTheme(name) {
+  var t = THEMES[name] || THEMES[THEME_DEFAULT];
+  var root = document.documentElement.style;
+  root.setProperty('--ink', t.ink);
+  root.setProperty('--parchment', t.parchment);
+  root.setProperty('--wood', t.wood);
+  root.setProperty('--gold', t.gold);
+  root.setProperty('--gold-hover', t.goldHover);
+  root.setProperty('--gold-shadow', t.goldShadow);
+  root.setProperty('--gold-active', t.goldActive);
+  root.setProperty('--muted', t.muted);
+  root.setProperty('--chip-bg', t.chipBg);
+  root.setProperty('--chip-border', t.chipBorder);
+  root.setProperty('--chip-shadow', t.chipShadow);
+  root.setProperty('--outline', t.outline);
+  root.setProperty('--violet', t.violet || '#EE7EEB');
+  root.setProperty('--electric-aqua', t.electricAqua || '#46E0EC');
+  root.setProperty('--banana-cream', t.bananaCream || '#FFE964');
+  root.setProperty('--royal-gold', t.royalGold || '#EDCF54');
+  root.setProperty('--wisteria-blue', t.wisteriaBlue || '#88A5E2');
+  root.setProperty('--dusty-mauve', t.dustyMauve || '#8C78A0');
+  var btn = document.getElementById('themeButton');
+  if (btn) btn.textContent = 'Theme: ' + THEME_LABEL[name];
+}
+
+function cycleTheme() {
+  var cur = localStorage.getItem('automancia_theme') || THEME_DEFAULT;
+  var next = THEME_ORDER[(THEME_ORDER.indexOf(cur) + 1) % THEME_ORDER.length];
+  localStorage.setItem('automancia_theme', next);
+  applyTheme(next);
+}
+
+applyTheme(localStorage.getItem('automancia_theme') || THEME_DEFAULT);
+document.getElementById('themeButton').onclick = cycleTheme;
+window.addEventListener('storage', function(e) {
+  if (e.key === 'automancia_theme') applyTheme(e.newValue || THEME_DEFAULT);
+});
 
 onbeforeunload = function() {
   return "Confirm to leave / refresh page. Data won't be saved.";
@@ -346,9 +688,73 @@ var EXCL  = 4; // +TINT = EXCL_PART
 var TINT  = 5;
 
 var COLOR = [
-  '#fff', '#36c', '#f00', '#808', '#33f',
-  '#ff0', '#acf', '#f80', '#caf', '#bbf'
+  '#fff', '#36c', '#f00', '#8C78A0', '#33f',
+  '#f0c14b', '#acf', '#f80', '#d4c8dc', '#bbf'
 ];
+
+var CARD_MARGIN = 12; // left/top inset of a wand card's own content
+var SLOT_TOP = 12;    // per-wand "confirmed slot" preview row
+var TOP_OFFSET = 82;  // where the 50-cell grid starts (12 + 66 + 4px gap)
+
+var LEGEND = [
+  [CLEAN,      'Unknown',          'No evidence yet — could still be anywhere.'],
+  [MARK,       'Seen',             'Confirmed on this wand, slot unknown.'],
+  [RED,        'Confirmed',        'Placed in this exact slot.'],
+  [FORG,       'Forgotten',        'Was confirmed, then reset by a forget effect.'],
+  [EXCL,       'Excluded',         'Ruled out for this slot by the rules.'],
+  [MARK+TINT,  'Possible',         'A seen effect elsewhere could still land here.'],
+  [FORG+TINT,  'Weakly forgotten', 'Forgotten, inferred indirectly.'],
+  [EXCL+TINT,  'Leaning excluded', 'Probably ruled out, not proven yet.']
+];
+
+// Reverse-lookup so a cell's own tooltip can show the same status wording
+// as the legend chips, keyed by the numeric cell-state code (COLOR/LEGEND
+// share that code).
+var STATE_LABEL = {};
+LEGEND.forEach(function(item) { STATE_LABEL[item[0]] = item[1]; });
+
+// The main page (index.html, same-origin) keeps the English effect names
+// this tool doesn't have (FX here is Portuguese-only); reach across for
+// them rather than duplicating the list.
+function englishEffectName(id) {
+  try {
+    var names = window.parent.effectMapName;
+    return names && names[id] ? names[id].replace(/\b\w/g, function(c) { return c.toUpperCase(); }) : null;
+  } catch (e) { return null; }
+}
+
+function cellTipText(w, i) {
+  var s = state.cells[w][i];
+  var en = englishEffectName(i);
+  var name = FX[i].name + (en ? ' — ' + en : '');
+  var status = STATE_LABEL[s[0]];
+  return status ? name + ' (' + status + ')' : name;
+}
+
+function slotTipText(w, j) {
+  var s = state.slots[w][j];
+  if (s[1] === -1) return 'Slot ' + (j + 1) + ': not yet confirmed';
+  var en = englishEffectName(s[1]);
+  return 'Slot ' + (j + 1) + ': ' + FX[s[1]].name + (en ? ' — ' + en : '');
+}
+
+function buildChrome() {
+  var legend = document.getElementById('legend');
+  LEGEND.forEach(function(item) {
+    var li = document.createElement('li');
+    li.setAttribute('data-tip', item[2]);
+
+    var sw = document.createElement('span');
+    sw.className = 'sw';
+    sw.style.background = COLOR[item[0]];
+    li.appendChild(sw);
+
+    li.appendChild(document.createTextNode(item[1]));
+    legend.appendChild(li);
+  });
+}
+buildChrome();
+initTooltips();
 
 function newState(arrs) {
   var cells = [];
@@ -692,66 +1098,108 @@ function recalc() {
       if (slot.img.style.background !== img) {
         slot.img.style.background = img;
       }
+      slot.num.classList.toggle('show', sel !== null && sel[0] === i);
     }
   }
 }
 
+var WAND_COLORS = ['var(--violet)', 'var(--electric-aqua)', 'var(--banana-cream)', 'var(--royal-gold)', 'var(--wisteria-blue)'];
+
 for (var i = 0; i < 5; i++) {
+  var cardEl = document.createElement('div');
+  cardEl.className = 'wandCard';
+  wandsRowEl.appendChild(cardEl);
+
+  var tag = document.createElement('div');
+  tag.className = 'wandTag';
+  tag.textContent = i + 1;
+  tag.style.left = (CARD_MARGIN - 13) + 'px';
+  tag.style.top = (SLOT_TOP - 17) + 'px';
+  tag.style.background = WAND_COLORS[i];
+  cardEl.appendChild(tag);
+
   var img = document.createElement('img');
   img.src = 'cincomancia.png';
   img.className = 'grid';
-  img.style.left = '' + (66 + (i * 396)) + 'px';
-  document.body.appendChild(img);
+  img.style.top = TOP_OFFSET + 'px';
+  img.style.left = CARD_MARGIN + 'px';
+  cardEl.appendChild(img);
   var a = [];
   var j;
   for (j = 0; j < 50; j++) {
     var cell = {};
-    var upper = 114 + (FX[j].y * 66);
-    var left = 66 + (i * 396) + (FX[j].x * 66);
+    var upper = TOP_OFFSET + (FX[j].y * 66);
+    var left = CARD_MARGIN + (FX[j].x * 66);
     cell.outer = document.createElement('div');
     cell.outer.className = 'boxOuter';
     cell.outer.style.top = '' + upper + 'px';
     cell.outer.style.left = '' + left + 'px';
     cell.outer.style.backgroundColor = COLOR[state.cells[i][j][0]];
-    document.body.appendChild(cell.outer);
+    cardEl.appendChild(cell.outer);
     cell.right = document.createElement('img');
     cell.right.src = 'cinconada.png';
     cell.right.className = 'boxRight';
     cell.right.style.top = '' + (upper + 42) + 'px';
     cell.right.style.left = '' + (left + 42) + 'px';
     cell.right.onmousedown = cellClicked.bind(null, i, j, true);
-    document.body.appendChild(cell.right);
+    cardEl.appendChild(cell.right);
     cell.left = document.createElement('div');
     cell.left.className = 'boxLeft';
     cell.left.style.top = '' + (upper + 42) + 'px';
     cell.left.style.left = '' + left + 'px';
     cell.left.onmousedown = cellClicked.bind(null, i, j, false);
-    document.body.appendChild(cell.left);
+    cardEl.appendChild(cell.left);
     cell.upper = document.createElement('div');
     cell.upper.className = 'boxUpper';
     cell.upper.style.top = '' + upper + 'px';
     cell.upper.style.left = '' + left + 'px';
     cell.upper.onmousedown = cellClicked.bind(null, i, j, false);
-    document.body.appendChild(cell.upper);
+    cardEl.appendChild(cell.upper);
+
+    // The three overlays (right/left/upper) fully tile the cell and paint
+    // on top of it, so the hover listener has to live on them, not on
+    // cell.outer underneath -- text is computed fresh each hover so it
+    // stays right as the cell's state changes.
+    (function(w, idx) {
+      var onEnter = function() { if (boardTipsEnabled()) gtipShowText(this, cellTipText(w, idx)); };
+      cell.right.addEventListener('mouseenter', onEnter);
+      cell.right.addEventListener('mouseleave', gtipHide);
+      cell.left.addEventListener('mouseenter', onEnter);
+      cell.left.addEventListener('mouseleave', gtipHide);
+      cell.upper.addEventListener('mouseenter', onEnter);
+      cell.upper.addEventListener('mouseleave', gtipHide);
+    })(i, j);
+
     a.push(cell);
   }
   cells.push(a);
   a = [];
   for (j = 0; j < 5; j++) {
     var slot = {};
-    var left = '' + (66 + (i * 396) + (j * 66)) + 'px';
+    var left = (CARD_MARGIN + j*66) + 'px';
     slot.outer = document.createElement('div');
     slot.outer.className = 'boxOuter';
-    slot.outer.style.top = '24px';
+    slot.outer.style.top = SLOT_TOP + 'px';
     slot.outer.style.left = left;
-    document.body.appendChild(slot.outer);
+    cardEl.appendChild(slot.outer);
     slot.img = document.createElement('img');
     slot.img.src = 'cinconada.png';
     slot.img.className = 'boxFull';
-    slot.img.style.top = '24px';
+    slot.img.style.top = SLOT_TOP + 'px';
     slot.img.style.left = left;
     slot.img.onmousedown = slotClicked.bind(null, i, j);
-    document.body.appendChild(slot.img);
+    (function(w, idx) {
+      slot.img.addEventListener('mouseenter', function() { if (boardTipsEnabled()) gtipShowText(this, slotTipText(w, idx)); });
+      slot.img.addEventListener('mouseleave', gtipHide);
+    })(i, j);
+    cardEl.appendChild(slot.img);
+    var slotNum = document.createElement('div');
+    slotNum.className = 'slotNum';
+    slotNum.textContent = j + 1;
+    slotNum.style.top = (SLOT_TOP + 2) + 'px';
+    slotNum.style.left = (CARD_MARGIN + j*66 + 2) + 'px';
+    cardEl.appendChild(slotNum);
+    slot.num = slotNum;
     a.push(slot);
   }
   slots.push(a);
@@ -777,4 +1225,10 @@ if (window.location.href.indexOf("jogo=") != -1) {
   setJogoRules(Number(window.location.href.split("jogo=")[1]));
 } else setJogoRules(5);
 
+updateWandsScale();
+window.addEventListener('resize', updateWandsScale);
+
+if (location.hash.indexOf('#themetest=') === 0) {
+  applyTheme(location.hash.slice(11));
+}
 </script></body></html>
