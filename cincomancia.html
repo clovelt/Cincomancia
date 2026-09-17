@@ -118,6 +118,14 @@ div, img { position: absolute }
 	transform: translateY(3px);
 	box-shadow: none;
 }
+.chromeBtn:disabled {
+	opacity: .4;
+	cursor: default;
+	background: var(--gold);
+	box-shadow: 0 3px 0 var(--gold-shadow);
+	transform: none;
+}
+.chromeBtn:disabled:hover { background: var(--gold); }
 
 /* Everything but the legend is grouped here so wrapping (on a narrow
    window) moves this whole cluster to its own line as one unit, instead
@@ -224,6 +232,8 @@ div, img { position: absolute }
 <div id="chrome">
 	<ul id="legend"></ul>
 	<div id="controlsGroup">
+		<button id="undoButton" class="chromeBtn" type="button" disabled data-tip="Undo the last cell/slot change.">Undo</button>
+		<button id="redoButton" class="chromeBtn" type="button" disabled data-tip="Redo the change just undone.">Redo</button>
 		<button id="resetButton" class="chromeBtn">Reset</button>
 		<button id="themeButton" class="chromeBtn" type="button"></button>
 	</div>
@@ -873,6 +883,79 @@ function slotClicked(w, j) {
   recalc();
 }
 
+// ------------------------------------------------------------
+// Undo/redo: snapshot-based rather than inverting each mutation by hand.
+// cellClicked/slotClicked (and the Reset button, wrapped further down)
+// each touch `state`/`timelines` through several different branches --
+// re-deriving the exact inverse of each one would be easy to get subtly
+// wrong. Instead, every mutating entry point gets wrapped by
+// withHistory() below, which snapshots a serialized copy of both
+// `state` and `timelines` before calling the real handler and compares
+// it to the same snapshot taken after -- only pushing a historyStack entry
+// if something actually changed, so a click that merely moves `sel`
+// (choosing a cell to assign a slot to, or deselecting) doesn't clutter
+// the undo stack with no-op steps. recalc() always fully re-derives
+// `state` from `timelines` plus whatever cells are RED/FORG (the only
+// two states it treats as authoritative input, everything else is
+// inferred fresh every call -- see its own comments below), so
+// restoring an old (state, timelines) pair and calling recalc() exactly
+// reproduces that point in historyStack.
+// ------------------------------------------------------------
+var undoButton = document.getElementById('undoButton');
+var redoButton = document.getElementById('redoButton');
+
+function snapshotKey() {
+  return JSON.stringify(state) + ' ' + JSON.stringify(timelines);
+}
+
+function cloneSnapshot() {
+  return { state: JSON.parse(JSON.stringify(state)), timelines: JSON.parse(JSON.stringify(timelines)) };
+}
+
+var historyStack = [cloneSnapshot()];
+var historyPos = 0;
+
+function updateHistoryButtons() {
+  undoButton.disabled = historyPos <= 0;
+  redoButton.disabled = historyPos >= historyStack.length - 1;
+}
+
+function withHistory(fn) {
+  return function() {
+    var before = snapshotKey();
+    fn.apply(null, arguments);
+    if (snapshotKey() === before) return;
+    historyStack.length = historyPos + 1; // drop any redo tail once a new change branches off
+    historyStack.push(cloneSnapshot());
+    historyPos = historyStack.length - 1;
+    updateHistoryButtons();
+  };
+}
+
+function goToHistory(pos) {
+  var snap = historyStack[pos];
+  state = JSON.parse(JSON.stringify(snap.state));
+  timelines = JSON.parse(JSON.stringify(snap.timelines));
+  historyPos = pos;
+  sel = null;
+  recalc();
+  updateHistoryButtons();
+}
+
+function undo() {
+  if (historyPos > 0) goToHistory(historyPos - 1);
+}
+
+function redo() {
+  if (historyPos < historyStack.length - 1) goToHistory(historyPos + 1);
+}
+
+undoButton.onclick = undo;
+redoButton.onclick = redo;
+
+cellClicked = withHistory(cellClicked);
+slotClicked = withHistory(slotClicked);
+
 function recalc() {
   var ns = newState(true);
   var count = [];
@@ -1205,25 +1288,37 @@ for (var i = 0; i < 5; i++) {
   slots.push(a);
 }
 
-document.getElementById('resetButton').onclick = function() {
+document.getElementById('resetButton').onclick = withHistory(function() {
   if (confirm('Reset everything?')) {
     timelines = [[], [], [], [], []];
     sel = null;
     state = newState(false);
     recalc();
   }
-};
+});
 
 function forceReset() {
   timelines = [[], [], [], [], []];
   sel = null;
   state = newState(false);
   recalc();
+  historyStack = [cloneSnapshot()];
+  historyPos = 0;
+  updateHistoryButtons();
 }
 
 if (window.location.href.indexOf("jogo=") != -1) {
   setJogoRules(Number(window.location.href.split("jogo=")[1]));
 } else setJogoRules(5);
+
+// setJogoRules (jogo<5 branch) pre-marks a few cells via the wrapped
+// cellClicked, which would otherwise leave those clicks sitting in the
+// undo stack as if the player made them. Re-baseline historyStack here so
+// index 0 is "board as the rules left it", not "board before the rules
+// ran" -- Undo correctly does nothing until the player's own first click.
+historyStack = [cloneSnapshot()];
+historyPos = 0;
+updateHistoryButtons();
 
 updateWandsScale();
 window.addEventListener('resize', updateWandsScale);
